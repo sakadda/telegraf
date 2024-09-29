@@ -57,9 +57,30 @@ func determineConversion(dtype string) converterFunc {
 			x := binary.BigEndian.Uint32(buf)
 			return math.Float32frombits(x)
 		}
+	case "RR":
+		return func(buf []byte) interface{} {
+			x := binary.BigEndian.Uint64(buf)
+			rounded := math.Round(math.Float64frombits(x)*100) / 100
+			return rounded
+		}
 	case "DT":
 		return func(buf []byte) interface{} {
 			return helper.GetDateTimeAt(buf, 0).UnixNano()
+		}
+	case "LR":
+		return func(buf []byte) interface{} {
+			if len(buf) != 8 {
+				return ""
+			}
+			bits := binary.BigEndian.Uint64(buf)
+			return math.Float64frombits(bits)
+		}
+	case "LI":
+		return func(buf []byte) interface{} {
+			if len(buf) != 8 {
+				return ""
+			}
+			return int64(binary.BigEndian.Uint64(buf))
 		}
 	}
 
