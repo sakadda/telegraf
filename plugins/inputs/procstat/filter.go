@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/filter"
@@ -107,7 +107,7 @@ func (f *Filter) ApplyFilter() ([]processGroup, error) {
 		}
 		groups = append(groups, g...)
 	case len(f.SystemdUnits) > 0:
-		g, err := findBySystemdUnits(f.CGroups)
+		g, err := findBySystemdUnits(f.SystemdUnits)
 		if err != nil {
 			return nil, err
 		}

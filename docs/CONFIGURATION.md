@@ -261,7 +261,8 @@ The agent table configures Telegraf and the defaults used across all plugins.
 - **metric_buffer_limit**:
   Maximum number of unwritten metrics per output.  Increasing this value
   allows for longer periods of output downtime without dropping metrics at the
-  cost of higher maximum memory usage.
+  cost of higher maximum memory usage. Oldest metrics are overwritten in favor
+  of new ones when the buffer fills up.
 
 - **collection_jitter**:
   Collection jitter is used to jitter the collection by a random [interval][].
@@ -361,7 +362,7 @@ The agent table configures Telegraf and the defaults used across all plugins.
 
 - **buffer_directory**:
   The directory to use when in `disk` buffer mode. Each output plugin will make
-  another subdirectory in this directory with the output plugin's name.
+  another subdirectory in this directory with the output plugin's ID.
 
 ## Plugins
 
@@ -396,6 +397,14 @@ Parameters that can be used with any input plugin:
 
   When this value is set on a service input, multiple events occurring at the
   same timestamp may be merged by the output database.
+- **time_source**:
+  Specifies the source of the timestamp on metrics. Possible values are:
+  - `metric` will not alter the metric (default)
+  - `collection_start` sets the timestamp to when collection started
+  - `collection_end` set the timestamp to when collection finished
+
+  `time_source` will NOT be used for service inputs. It is up to each individual
+  service input to set the timestamp.
 - **collection_jitter**:
   Overrides the `collection_jitter` setting of the [agent][Agent] for the
   plugin.  Collection jitter is used to jitter the collection by a random

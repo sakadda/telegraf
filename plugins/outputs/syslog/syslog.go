@@ -17,7 +17,7 @@ import (
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/internal"
-	tlsint "github.com/influxdata/telegraf/plugins/common/tls"
+	common_tls "github.com/influxdata/telegraf/plugins/common/tls"
 	"github.com/influxdata/telegraf/plugins/outputs"
 )
 
@@ -37,7 +37,7 @@ type Syslog struct {
 	Trailer             nontransparent.TrailerType
 	Log                 telegraf.Logger `toml:"-"`
 	net.Conn
-	tlsint.ClientConfig
+	common_tls.ClientConfig
 	mapper *SyslogMapper
 }
 
@@ -121,13 +121,14 @@ func (s *Syslog) Write(metrics []telegraf.Metric) (err error) {
 		}
 	}
 	for _, metric := range metrics {
-		var msg *rfc5424.SyslogMessage
-		if msg, err = s.mapper.MapMetricToSyslogMessage(metric); err != nil {
+		msg, err := s.mapper.MapMetricToSyslogMessage(metric)
+		if err != nil {
 			s.Log.Errorf("Failed to create syslog message: %v", err)
 			continue
 		}
-		var msgBytesWithFraming []byte
-		if msgBytesWithFraming, err = s.getSyslogMessageBytesWithFraming(msg); err != nil {
+
+		msgBytesWithFraming, err := s.getSyslogMessageBytesWithFraming(msg)
+		if err != nil {
 			s.Log.Errorf("Failed to convert syslog message with framing: %v", err)
 			continue
 		}

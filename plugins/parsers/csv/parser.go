@@ -83,8 +83,7 @@ func (record metadataPattern) Less(i, j int) bool {
 
 func (p *Parser) initializeMetadataSeparators() error {
 	// initialize metadata
-	p.metadataTags = map[string]string{}
-	p.metadataSeparatorList = []string{}
+	p.metadataTags = make(map[string]string)
 
 	if p.MetadataRows <= 0 {
 		return nil
@@ -94,8 +93,8 @@ func (p *Parser) initializeMetadataSeparators() error {
 		return errors.New("csv_metadata_separators required when specifying csv_metadata_rows")
 	}
 
-	p.metadataSeparatorList = metadataPattern{}
-	patternList := map[string]bool{}
+	p.metadataSeparatorList = make(metadataPattern, 0, len(p.MetadataSeparators))
+	patternList := make(map[string]bool, len(p.MetadataSeparators))
 	for _, pattern := range p.MetadataSeparators {
 		if patternList[pattern] {
 			// Ignore further, duplicated entries

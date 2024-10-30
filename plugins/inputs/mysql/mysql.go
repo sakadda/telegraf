@@ -20,8 +20,8 @@ import (
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/plugins/common/tls"
 	"github.com/influxdata/telegraf/plugins/inputs"
-	v1 "github.com/influxdata/telegraf/plugins/inputs/mysql/v1"
-	v2 "github.com/influxdata/telegraf/plugins/inputs/mysql/v2"
+	"github.com/influxdata/telegraf/plugins/inputs/mysql/v1"
+	"github.com/influxdata/telegraf/plugins/inputs/mysql/v2"
 )
 
 //go:embed sample.conf
@@ -992,7 +992,7 @@ func (m *Mysql) gatherUserStatisticsStatuses(db *sql.DB, servtag string, acc tel
 		}
 
 		tags := map[string]string{"server": servtag, "user": *read[0].(*string)}
-		fields := map[string]interface{}{}
+		fields := make(map[string]interface{}, len(cols))
 
 		for i := range cols {
 			if i == 0 {

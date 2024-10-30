@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -51,7 +51,6 @@ type Kubernetes struct {
 func init() {
 	inputs.Add("kubernetes", func() telegraf.Input {
 		return &Kubernetes{
-			LabelInclude: []string{},
 			LabelExclude: []string{"*"},
 		}
 	})

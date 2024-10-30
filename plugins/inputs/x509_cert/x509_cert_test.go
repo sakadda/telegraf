@@ -27,7 +27,7 @@ import (
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/metric"
-	_tls "github.com/influxdata/telegraf/plugins/common/tls"
+	common_tls "github.com/influxdata/telegraf/plugins/common/tls"
 	"github.com/influxdata/telegraf/testutil"
 )
 
@@ -89,18 +89,25 @@ func TestGatherRemoteIntegration(t *testing.T) {
 
 			go func() {
 				sconn, err := ln.Accept()
-				require.NoError(t, err)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+
 				if test.close {
 					sconn.Close()
 				}
 
 				serverConfig := cfg.Clone()
-
 				srv := tls.Server(sconn, serverConfig)
 				if test.noshake {
 					srv.Close()
 				}
-				require.NoError(t, srv.Handshake())
+
+				if err = srv.Handshake(); err != nil {
+					t.Error(err)
+					return
+				}
 			}()
 
 			if test.server == "" {
@@ -318,8 +325,9 @@ func TestGatherUDPCertIntegration(t *testing.T) {
 	defer listener.Close()
 
 	go func() {
-		_, err := listener.Accept()
-		require.NoError(t, err)
+		if _, err := listener.Accept(); err != nil {
+			t.Error(err)
+		}
 	}()
 
 	m := &X509Cert{
@@ -457,7 +465,7 @@ func TestServerName(t *testing.T) {
 			sc := &X509Cert{
 				Sources:      []string{test.url},
 				ServerName:   test.fromCfg,
-				ClientConfig: _tls.ClientConfig{ServerName: test.fromTLS},
+				ClientConfig: common_tls.ClientConfig{ServerName: test.fromTLS},
 				Log:          testutil.Logger{},
 			}
 			err := sc.Init()
@@ -569,7 +577,7 @@ func TestClassification(t *testing.T) {
 	certURI := "file://" + filepath.Join(tmpDir, "cert.pem")
 	plugin := &X509Cert{
 		Sources: []string{certURI},
-		ClientConfig: _tls.ClientConfig{
+		ClientConfig: common_tls.ClientConfig{
 			TLSCA: filepath.Join(tmpDir, "ca.pem"),
 		},
 		Log: testutil.Logger{},

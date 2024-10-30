@@ -230,7 +230,7 @@ func (p *Parser) processMetric(input []byte, data []DataSet, tag bool, timestamp
 	metrics := make([][]telegraf.Metric, 0, len(data))
 	for _, c := range data {
 		if c.Path == "" {
-			return nil, errors.New("GJSON path is required")
+			return nil, errors.New("the GJSON path is required")
 		}
 		result := gjson.GetBytes(input, c.Path)
 		if err := p.checkResult(result, c.Path); err != nil {
@@ -260,8 +260,8 @@ func (p *Parser) processMetric(input []byte, data []DataSet, tag bool, timestamp
 			Tag:         tag,
 			Metric: metric.New(
 				p.measurementName,
-				map[string]string{},
-				map[string]interface{}{},
+				make(map[string]string),
+				make(map[string]interface{}),
 				timestamp,
 			),
 			Result:      result,
@@ -341,8 +341,8 @@ func (p *Parser) expandArray(result metricNode, timestamp time.Time) ([]telegraf
 		result.ForEach(func(_, val gjson.Result) bool {
 			m := metric.New(
 				p.measurementName,
-				map[string]string{},
-				map[string]interface{}{},
+				make(map[string]string),
+				make(map[string]interface{}),
 				timestamp,
 			)
 			if val.IsObject() {
@@ -477,7 +477,7 @@ func (p *Parser) processObjects(input []byte, objects []Object, timestamp time.T
 		p.objectConfig = c
 
 		if c.Path == "" {
-			return nil, errors.New("GJSON path is required")
+			return nil, errors.New("the GJSON path is required")
 		}
 
 		result := gjson.GetBytes(input, c.Path)
@@ -519,8 +519,8 @@ func (p *Parser) processObjects(input []byte, objects []Object, timestamp time.T
 		rootObject := metricNode{
 			Metric: metric.New(
 				p.measurementName,
-				map[string]string{},
-				map[string]interface{}{},
+				make(map[string]string),
+				make(map[string]interface{}),
 				timestamp,
 			),
 			Result:      result,
@@ -649,7 +649,7 @@ func (p *Parser) isExcluded(key string) bool {
 }
 
 func (p *Parser) ParseLine(_ string) (telegraf.Metric, error) {
-	return nil, errors.New("ParseLine is designed for parsing influx line protocol, therefore not implemented for parsing JSON")
+	return nil, errors.New("parsing line is not supported by JSON format")
 }
 
 func (p *Parser) SetDefaultTags(tags map[string]string) {

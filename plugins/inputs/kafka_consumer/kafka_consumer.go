@@ -4,6 +4,7 @@ package kafka_consumer
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -51,7 +52,7 @@ type KafkaConsumer struct {
 	MsgHeaderAsMetricName                string          `toml:"msg_header_as_metric_name"`
 	TimestampSource                      string          `toml:"timestamp_source"`
 	ConsumerFetchDefault                 config.Size     `toml:"consumer_fetch_default"`
-	ConnectionStrategy                   string          `toml:"connection_strategy"`
+	ConnectionStrategy                   string          `toml:"connection_strategy" deprecated:"1.33.0;1.40.0;use 'startup_error_behavior' instead"`
 	ResolveCanonicalBootstrapServersOnly bool            `toml:"resolve_canonical_bootstrap_servers_only"`
 	Log                                  telegraf.Logger `toml:"-"`
 	kafka.ReadConfig
@@ -63,7 +64,6 @@ type KafkaConsumer struct {
 	topicClient     sarama.Client
 	regexps         []regexp.Regexp
 	allWantedTopics []string
-	ticker          *time.Ticker
 	fingerprint     string
 
 	parser    telegraf.Parser
@@ -131,7 +131,7 @@ func (k *KafkaConsumer) Init() error {
 	}
 
 	if err := k.SetConfig(cfg, k.Log); err != nil {
-		return fmt.Errorf("SetConfig: %w", err)
+		return fmt.Errorf("setting config failed: %w", err)
 	}
 
 	switch strings.ToLower(k.Offset) {
@@ -307,7 +307,10 @@ func (k *KafkaConsumer) Start(acc telegraf.Accumulator) error {
 	if k.ConnectionStrategy != "defer" {
 		err = k.create()
 		if err != nil {
-			return fmt.Errorf("create consumer: %w", err)
+			return &internal.StartupError{
+				Err:   fmt.Errorf("create consumer: %w", err),
+				Retry: errors.Is(err, sarama.ErrOutOfBrokers),
+			}
 		}
 		k.startErrorAdder(acc)
 	}
@@ -372,15 +375,13 @@ func (k *KafkaConsumer) Gather(_ telegraf.Accumulator) error {
 }
 
 func (k *KafkaConsumer) Stop() {
-	if k.ticker != nil {
-		k.ticker.Stop()
-	}
 	// Lock so that a topic refresh cannot start while we are stopping.
 	k.topicLock.Lock()
-	defer k.topicLock.Unlock()
 	if k.topicClient != nil {
 		k.topicClient.Close()
 	}
+	k.topicLock.Unlock()
+
 	k.cancel()
 	k.wg.Wait()
 }

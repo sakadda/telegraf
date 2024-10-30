@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	eventhubClient "github.com/Azure/azure-event-hubs-go/v3"
+	eventhub "github.com/Azure/azure-event-hubs-go/v3"
 	"github.com/Azure/azure-event-hubs-go/v3/persist"
 
 	"github.com/influxdata/telegraf"
@@ -26,10 +26,6 @@ const (
 	defaultMaxUndeliveredMessages = 1000
 )
 
-type empty struct{}
-type semaphore chan empty
-
-// EventHub is the top level struct for this plugin
 type EventHub struct {
 	// Configuration
 	ConnectionString       string    `toml:"connection_string"`
@@ -62,7 +58,7 @@ type EventHub struct {
 	Log telegraf.Logger `toml:"-"`
 
 	// Azure
-	hub    *eventhubClient.Hub
+	hub    *eventhub.Hub
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
@@ -70,28 +66,22 @@ type EventHub struct {
 	in     chan []telegraf.Metric
 }
 
+type (
+	empty     struct{}
+	semaphore chan empty
+)
+
 func (*EventHub) SampleConfig() string {
 	return sampleConfig
 }
 
-// SetParser sets the parser
-func (e *EventHub) SetParser(parser telegraf.Parser) {
-	e.parser = parser
-}
-
-// Gather function is unused
-func (*EventHub) Gather(telegraf.Accumulator) error {
-	return nil
-}
-
-// Init the EventHub ServiceInput
 func (e *EventHub) Init() (err error) {
 	if e.MaxUndeliveredMessages == 0 {
 		e.MaxUndeliveredMessages = defaultMaxUndeliveredMessages
 	}
 
 	// Set hub options
-	hubOpts := []eventhubClient.HubOption{}
+	hubOpts := []eventhub.HubOption{}
 
 	if e.PersistenceDir != "" {
 		persister, err := persist.NewFilePersister(e.PersistenceDir)
@@ -99,26 +89,29 @@ func (e *EventHub) Init() (err error) {
 			return err
 		}
 
-		hubOpts = append(hubOpts, eventhubClient.HubWithOffsetPersistence(persister))
+		hubOpts = append(hubOpts, eventhub.HubWithOffsetPersistence(persister))
 	}
 
 	if e.UserAgent != "" {
-		hubOpts = append(hubOpts, eventhubClient.HubWithUserAgent(e.UserAgent))
+		hubOpts = append(hubOpts, eventhub.HubWithUserAgent(e.UserAgent))
 	} else {
-		hubOpts = append(hubOpts, eventhubClient.HubWithUserAgent(internal.ProductToken()))
+		hubOpts = append(hubOpts, eventhub.HubWithUserAgent(internal.ProductToken()))
 	}
 
 	// Create event hub connection
 	if e.ConnectionString != "" {
-		e.hub, err = eventhubClient.NewHubFromConnectionString(e.ConnectionString, hubOpts...)
+		e.hub, err = eventhub.NewHubFromConnectionString(e.ConnectionString, hubOpts...)
 	} else {
-		e.hub, err = eventhubClient.NewHubFromEnvironment(hubOpts...)
+		e.hub, err = eventhub.NewHubFromEnvironment(hubOpts...)
 	}
 
 	return err
 }
 
-// Start the EventHub ServiceInput
+func (e *EventHub) SetParser(parser telegraf.Parser) {
+	e.parser = parser
+}
+
 func (e *EventHub) Start(acc telegraf.Accumulator) error {
 	e.in = make(chan []telegraf.Metric)
 
@@ -155,25 +148,38 @@ func (e *EventHub) Start(acc telegraf.Accumulator) error {
 	return nil
 }
 
-func (e *EventHub) configureReceiver() []eventhubClient.ReceiveOption {
-	receiveOpts := []eventhubClient.ReceiveOption{}
+func (*EventHub) Gather(telegraf.Accumulator) error {
+	return nil
+}
+
+func (e *EventHub) Stop() {
+	err := e.hub.Close(context.Background())
+	if err != nil {
+		e.Log.Errorf("Error closing Event Hub connection: %v", err)
+	}
+	e.cancel()
+	e.wg.Wait()
+}
+
+func (e *EventHub) configureReceiver() []eventhub.ReceiveOption {
+	receiveOpts := []eventhub.ReceiveOption{}
 
 	if e.ConsumerGroup != "" {
-		receiveOpts = append(receiveOpts, eventhubClient.ReceiveWithConsumerGroup(e.ConsumerGroup))
+		receiveOpts = append(receiveOpts, eventhub.ReceiveWithConsumerGroup(e.ConsumerGroup))
 	}
 
 	if !e.FromTimestamp.IsZero() {
-		receiveOpts = append(receiveOpts, eventhubClient.ReceiveFromTimestamp(e.FromTimestamp))
+		receiveOpts = append(receiveOpts, eventhub.ReceiveFromTimestamp(e.FromTimestamp))
 	} else if e.Latest {
-		receiveOpts = append(receiveOpts, eventhubClient.ReceiveWithLatestOffset())
+		receiveOpts = append(receiveOpts, eventhub.ReceiveWithLatestOffset())
 	}
 
 	if e.PrefetchCount != 0 {
-		receiveOpts = append(receiveOpts, eventhubClient.ReceiveWithPrefetchCount(e.PrefetchCount))
+		receiveOpts = append(receiveOpts, eventhub.ReceiveWithPrefetchCount(e.PrefetchCount))
 	}
 
 	if e.Epoch != 0 {
-		receiveOpts = append(receiveOpts, eventhubClient.ReceiveWithEpoch(e.Epoch))
+		receiveOpts = append(receiveOpts, eventhub.ReceiveWithEpoch(e.Epoch))
 	}
 
 	return receiveOpts
@@ -182,7 +188,7 @@ func (e *EventHub) configureReceiver() []eventhubClient.ReceiveOption {
 // OnMessage handles an Event.  When this function returns without error the
 // Event is immediately accepted and the offset is updated.  If an error is
 // returned the Event is marked for redelivery.
-func (e *EventHub) onMessage(ctx context.Context, event *eventhubClient.Event) error {
+func (e *EventHub) onMessage(ctx context.Context, event *eventhub.Event) error {
 	metrics, err := e.createMetrics(event)
 	if err != nil {
 		return err
@@ -264,7 +270,7 @@ func deepCopyMetrics(in []telegraf.Metric) []telegraf.Metric {
 }
 
 // CreateMetrics returns the Metrics from the Event.
-func (e *EventHub) createMetrics(event *eventhubClient.Event) ([]telegraf.Metric, error) {
+func (e *EventHub) createMetrics(event *eventhub.Event) ([]telegraf.Metric, error) {
 	metrics, err := e.parser.Parse(event.Data)
 	if err != nil {
 		return nil, err
@@ -331,16 +337,6 @@ func (e *EventHub) createMetrics(event *eventhubClient.Event) ([]telegraf.Metric
 	}
 
 	return metrics, nil
-}
-
-// Stop the EventHub ServiceInput
-func (e *EventHub) Stop() {
-	err := e.hub.Close(context.Background())
-	if err != nil {
-		e.Log.Errorf("Error closing Event Hub connection: %v", err)
-	}
-	e.cancel()
-	e.wg.Wait()
 }
 
 func init() {

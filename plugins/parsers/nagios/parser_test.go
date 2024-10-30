@@ -30,10 +30,10 @@ func TestGetExitCode(t *testing.T) {
 		{
 			name: "unexpected error type",
 			errF: func() error {
-				return errors.New("I am not *exec.ExitError")
+				return errors.New("not *exec.ExitError")
 			},
 			expCode: 3,
-			expErr:  errors.New("I am not *exec.ExitError"),
+			expErr:  errors.New("not *exec.ExitError"),
 		},
 	}
 
@@ -148,7 +148,7 @@ func TestTryAddState(t *testing.T) {
 			runErrF: func() error {
 				return nil
 			},
-			metrics: []telegraf.Metric{},
+			metrics: make([]telegraf.Metric, 0),
 			assertF: func(t *testing.T, metrics []telegraf.Metric) {
 				require.Len(t, metrics, 1)
 				m := metrics[0]

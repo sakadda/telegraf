@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/influxdata/telegraf"
-	internalaws "github.com/influxdata/telegraf/plugins/common/aws"
+	common_aws "github.com/influxdata/telegraf/plugins/common/aws"
 	"github.com/influxdata/telegraf/plugins/outputs"
 )
 
@@ -73,7 +73,7 @@ type CloudWatchLogs struct {
 
 	Log telegraf.Logger `toml:"-"`
 
-	internalaws.CredentialConfig
+	common_aws.CredentialConfig
 }
 
 const (
@@ -205,7 +205,7 @@ func (c *CloudWatchLogs) Connect() error {
 			c.Log.Debugf("Log stream %q...", c.lsSource)
 		}
 
-		c.ls = map[string]*logStreamContainer{}
+		c.ls = make(map[string]*logStreamContainer)
 	}
 
 	return nil
@@ -302,7 +302,7 @@ func (c *CloudWatchLogs) Write(metrics []telegraf.Metric) error {
 			lsContainer = val
 		} else {
 			lsContainer.messageBatches[0].messageCount = 0
-			lsContainer.messageBatches[0].logEvents = []types.InputLogEvent{}
+			lsContainer.messageBatches[0].logEvents = make([]types.InputLogEvent, 0)
 			c.ls[logStream] = lsContainer
 		}
 
@@ -312,8 +312,9 @@ func (c *CloudWatchLogs) Write(metrics []telegraf.Metric) error {
 			lsContainer.currentBatchIndex++
 			lsContainer.messageBatches = append(lsContainer.messageBatches,
 				messageBatch{
-					logEvents:    []types.InputLogEvent{},
-					messageCount: 0})
+					messageCount: 0,
+				},
+			)
 			lsContainer.currentBatchSizeBytes = messageSizeInBytesForAWS
 		} else {
 			lsContainer.currentBatchSizeBytes += messageSizeInBytesForAWS
@@ -387,8 +388,8 @@ func (c *CloudWatchLogs) Write(metrics []telegraf.Metric) error {
 			}
 			// Cleanup batch
 			elem.messageBatches[index] = messageBatch{
-				logEvents:    []types.InputLogEvent{},
-				messageCount: 0}
+				messageCount: 0,
+			}
 
 			elem.sequenceToken = *putLogEventsOutput.NextSequenceToken
 		}

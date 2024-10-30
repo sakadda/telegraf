@@ -84,7 +84,7 @@ func MetricTime(sec int64) telegraf.Metric {
 
 func (s *BufferSuiteTest) newTestBuffer(capacity int) Buffer {
 	s.T().Helper()
-	buf, err := NewBuffer("test", "", capacity, s.bufferType, s.bufferPath)
+	buf, err := NewBuffer("test", "123", "", capacity, s.bufferType, s.bufferPath)
 	s.Require().NoError(err)
 	buf.Stats().MetricsAdded.Set(0)
 	buf.Stats().MetricsWritten.Set(0)
@@ -808,4 +808,27 @@ func (s *BufferSuiteTest) TestBuffer_RejectEmptyBatch() {
 	for _, m := range batch {
 		s.NotNil(m)
 	}
+}
+
+func (s *BufferSuiteTest) TestBuffer_FlushedPartial() {
+	b := s.newTestBuffer(5)
+	b.Add(MetricTime(1))
+	b.Add(MetricTime(2))
+	b.Add(MetricTime(3))
+	batch := b.Batch(2)
+	s.Len(batch, 2)
+
+	b.Accept(batch)
+	s.Equal(1, b.Len())
+}
+
+func (s *BufferSuiteTest) TestBuffer_FlushedFull() {
+	b := s.newTestBuffer(5)
+	b.Add(MetricTime(1))
+	b.Add(MetricTime(2))
+	batch := b.Batch(2)
+	s.Len(batch, 2)
+
+	b.Accept(batch)
+	s.Equal(0, b.Len())
 }

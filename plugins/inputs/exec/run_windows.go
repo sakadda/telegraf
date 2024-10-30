@@ -6,15 +6,16 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	osExec "os/exec"
+	"os/exec"
 	"syscall"
 	"time"
 
-	"github.com/influxdata/telegraf/internal"
 	"github.com/kballard/go-shellquote"
+
+	"github.com/influxdata/telegraf/internal"
 )
 
-func (c CommandRunner) Run(
+func (c commandRunner) run(
 	command string,
 	environments []string,
 	timeout time.Duration,
@@ -24,7 +25,7 @@ func (c CommandRunner) Run(
 		return nil, nil, fmt.Errorf("exec: unable to parse command: %w", err)
 	}
 
-	cmd := osExec.Command(splitCmd[0], splitCmd[1:]...)
+	cmd := exec.Command(splitCmd[0], splitCmd[1:]...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
 	}

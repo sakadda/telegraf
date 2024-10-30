@@ -12,20 +12,23 @@ import (
 	"time"
 
 	"github.com/google/gnxi/utils/xpath"
-	gnmiLib "github.com/openconfig/gnmi/proto/gnmi"
+	"github.com/openconfig/gnmi/proto/gnmi"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/internal/choice"
-	internaltls "github.com/influxdata/telegraf/plugins/common/tls"
+	common_tls "github.com/influxdata/telegraf/plugins/common/tls"
 	"github.com/influxdata/telegraf/plugins/common/yangmodel"
 	"github.com/influxdata/telegraf/plugins/inputs"
 )
 
 //go:embed sample.conf
 var sampleConfig string
+
+// Currently supported GNMI Extensions
+var supportedExtensions = []string{"juniper_header"}
 
 // Define the warning to show if we cannot get a metric name.
 const emptyNameWarning = `Got empty metric-name for response (field %q), usually
@@ -35,14 +38,10 @@ including your device model and the following response data:
 %+v
 This message is only printed once.`
 
-// Currently supported GNMI Extensions
-var supportedExtensions = []string{"juniper_header"}
-
-// gNMI plugin instance
 type GNMI struct {
 	Addresses            []string          `toml:"addresses"`
-	Subscriptions        []Subscription    `toml:"subscription"`
-	TagSubscriptions     []TagSubscription `toml:"tag_subscription"`
+	Subscriptions        []subscription    `toml:"subscription"`
+	TagSubscriptions     []tagSubscription `toml:"tag_subscription"`
 	Aliases              map[string]string `toml:"aliases"`
 	Encoding             string            `toml:"encoding"`
 	Origin               string            `toml:"origin"`
@@ -65,7 +64,7 @@ type GNMI struct {
 	KeepaliveTimeout     config.Duration   `toml:"keepalive_timeout"`
 	YangModelPaths       []string          `toml:"yang_model_paths"`
 	Log                  telegraf.Logger   `toml:"-"`
-	internaltls.ClientConfig
+	common_tls.ClientConfig
 
 	// Internal state
 	internalAliases map[*pathInfo]string
@@ -74,8 +73,7 @@ type GNMI struct {
 	wg              sync.WaitGroup
 }
 
-// Subscription for a gNMI client
-type Subscription struct {
+type subscription struct {
 	Name              string          `toml:"name"`
 	Origin            string          `toml:"origin"`
 	Path              string          `toml:"path"`
@@ -85,12 +83,11 @@ type Subscription struct {
 	HeartbeatInterval config.Duration `toml:"heartbeat_interval"`
 	TagOnly           bool            `toml:"tag_only" deprecated:"1.25.0;1.35.0;please use 'tag_subscription's instead"`
 
-	fullPath *gnmiLib.Path
+	fullPath *gnmi.Path
 }
 
-// Tag Subscription for a gNMI client
-type TagSubscription struct {
-	Subscription
+type tagSubscription struct {
+	subscription
 	Match    string   `toml:"match"`
 	Elements []string `toml:"elements"`
 }
@@ -145,8 +142,8 @@ func (c *GNMI) Init() error {
 
 		// Support and convert legacy TagOnly subscriptions
 		if subscription.TagOnly {
-			tagSub := TagSubscription{
-				Subscription: subscription,
+			tagSub := tagSubscription{
+				subscription: subscription,
 				Match:        "name",
 			}
 			c.TagSubscriptions = append(c.TagSubscriptions, tagSub)
@@ -201,15 +198,15 @@ func (c *GNMI) Init() error {
 	c.Log.Debugf("Internal alias mapping: %+v", c.internalAliases)
 
 	// Warn about configures insecure cipher suites
-	insecure := internaltls.InsecureCiphers(c.ClientConfig.TLSCipherSuites)
+	insecure := common_tls.InsecureCiphers(c.ClientConfig.TLSCipherSuites)
 	if len(insecure) > 0 {
 		c.Log.Warnf("Configured insecure cipher suites: %s", strings.Join(insecure, ","))
 	}
 
 	// Check the TLS configuration
 	if _, err := c.ClientConfig.TLSConfig(); err != nil {
-		if errors.Is(err, internaltls.ErrCipherUnsupported) {
-			secure, insecure := internaltls.Ciphers()
+		if errors.Is(err, common_tls.ErrCipherUnsupported) {
+			secure, insecure := common_tls.Ciphers()
 			c.Log.Info("Supported secure ciphers:")
 			for _, name := range secure {
 				c.Log.Infof("  %s", name)
@@ -310,18 +307,27 @@ func (c *GNMI) Start(acc telegraf.Accumulator) error {
 	return nil
 }
 
-func (s *Subscription) buildSubscription() (*gnmiLib.Subscription, error) {
+func (c *GNMI) Gather(_ telegraf.Accumulator) error {
+	return nil
+}
+
+func (c *GNMI) Stop() {
+	c.cancel()
+	c.wg.Wait()
+}
+
+func (s *subscription) buildSubscription() (*gnmi.Subscription, error) {
 	gnmiPath, err := parsePath(s.Origin, s.Path, "")
 	if err != nil {
 		return nil, err
 	}
-	mode, ok := gnmiLib.SubscriptionMode_value[strings.ToUpper(s.SubscriptionMode)]
+	mode, ok := gnmi.SubscriptionMode_value[strings.ToUpper(s.SubscriptionMode)]
 	if !ok {
 		return nil, fmt.Errorf("invalid subscription mode %s", s.SubscriptionMode)
 	}
-	return &gnmiLib.Subscription{
+	return &gnmi.Subscription{
 		Path:              gnmiPath,
-		Mode:              gnmiLib.SubscriptionMode(mode),
+		Mode:              gnmi.SubscriptionMode(mode),
 		HeartbeatInterval: uint64(time.Duration(s.HeartbeatInterval).Nanoseconds()),
 		SampleInterval:    uint64(time.Duration(s.SampleInterval).Nanoseconds()),
 		SuppressRedundant: s.SuppressRedundant,
@@ -329,9 +335,9 @@ func (s *Subscription) buildSubscription() (*gnmiLib.Subscription, error) {
 }
 
 // Create a new gNMI SubscribeRequest
-func (c *GNMI) newSubscribeRequest() (*gnmiLib.SubscribeRequest, error) {
+func (c *GNMI) newSubscribeRequest() (*gnmi.SubscribeRequest, error) {
 	// Create subscription objects
-	subscriptions := make([]*gnmiLib.Subscription, 0, len(c.Subscriptions)+len(c.TagSubscriptions))
+	subscriptions := make([]*gnmi.Subscription, 0, len(c.Subscriptions)+len(c.TagSubscriptions))
 	for _, subscription := range c.TagSubscriptions {
 		sub, err := subscription.buildSubscription()
 		if err != nil {
@@ -363,12 +369,12 @@ func (c *GNMI) newSubscribeRequest() (*gnmiLib.SubscribeRequest, error) {
 		return nil, fmt.Errorf("unsupported encoding %s", c.Encoding)
 	}
 
-	return &gnmiLib.SubscribeRequest{
-		Request: &gnmiLib.SubscribeRequest_Subscribe{
-			Subscribe: &gnmiLib.SubscriptionList{
+	return &gnmi.SubscribeRequest{
+		Request: &gnmi.SubscribeRequest_Subscribe{
+			Subscribe: &gnmi.SubscriptionList{
 				Prefix:       gnmiPath,
-				Mode:         gnmiLib.SubscriptionList_STREAM,
-				Encoding:     gnmiLib.Encoding(gnmiLib.Encoding_value[strings.ToUpper(c.Encoding)]),
+				Mode:         gnmi.SubscriptionList_STREAM,
+				Encoding:     gnmi.Encoding(gnmi.Encoding_value[strings.ToUpper(c.Encoding)]),
 				Subscription: subscriptions,
 				UpdatesOnly:  c.UpdatesOnly,
 			},
@@ -377,7 +383,7 @@ func (c *GNMI) newSubscribeRequest() (*gnmiLib.SubscribeRequest, error) {
 }
 
 // ParsePath from XPath-like string to gNMI path structure
-func parsePath(origin, pathToParse, target string) (*gnmiLib.Path, error) {
+func parsePath(origin, pathToParse, target string) (*gnmi.Path, error) {
 	gnmiPath, err := xpath.ToGNMIPath(pathToParse)
 	if err != nil {
 		return nil, err
@@ -387,31 +393,7 @@ func parsePath(origin, pathToParse, target string) (*gnmiLib.Path, error) {
 	return gnmiPath, err
 }
 
-// Stop listener and cleanup
-func (c *GNMI) Stop() {
-	c.cancel()
-	c.wg.Wait()
-}
-
-// Gather plugin measurements (unused)
-func (c *GNMI) Gather(_ telegraf.Accumulator) error {
-	return nil
-}
-
-func New() telegraf.Input {
-	return &GNMI{
-		Encoding: "proto",
-		Redial:   config.Duration(10 * time.Second),
-	}
-}
-
-func init() {
-	inputs.Add("gnmi", New)
-	// Backwards compatible alias:
-	inputs.Add("cisco_telemetry_gnmi", New)
-}
-
-func (s *Subscription) buildFullPath(c *GNMI) error {
+func (s *subscription) buildFullPath(c *GNMI) error {
 	var err error
 	if s.fullPath, err = xpath.ToGNMIPath(s.Path); err != nil {
 		return err
@@ -431,7 +413,7 @@ func (s *Subscription) buildFullPath(c *GNMI) error {
 	return nil
 }
 
-func (s *Subscription) buildAlias(aliases map[*pathInfo]string) error {
+func (s *subscription) buildAlias(aliases map[*pathInfo]string) error {
 	// Build the subscription path without keys
 	path, err := parsePath(s.Origin, s.Path, "")
 	if err != nil {
@@ -448,4 +430,17 @@ func (s *Subscription) buildAlias(aliases map[*pathInfo]string) error {
 		aliases[info] = name
 	}
 	return nil
+}
+
+func newGNMI() telegraf.Input {
+	return &GNMI{
+		Encoding: "proto",
+		Redial:   config.Duration(10 * time.Second),
+	}
+}
+
+func init() {
+	inputs.Add("gnmi", newGNMI)
+	// Backwards compatible alias:
+	inputs.Add("cisco_telemetry_gnmi", newGNMI)
 }

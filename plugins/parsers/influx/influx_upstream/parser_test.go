@@ -660,7 +660,7 @@ func TestStreamParser(t *testing.T) {
 			for {
 				m, err := parser.Next()
 				if err != nil {
-					if errors.Is(err, ErrEOF) {
+					if errors.Is(err, io.EOF) {
 						break
 					}
 					require.Equal(t, tt.err.Error(), err.Error())
@@ -683,9 +683,8 @@ func TestSeriesParser(t *testing.T) {
 		err      error
 	}{
 		{
-			name:    "empty",
-			input:   []byte(""),
-			metrics: []telegraf.Metric{},
+			name:  "empty",
+			input: []byte(""),
 		},
 		{
 			name:  "minimal",
@@ -715,9 +714,8 @@ func TestSeriesParser(t *testing.T) {
 			},
 		},
 		{
-			name:    "missing tag value",
-			input:   []byte("cpu,a="),
-			metrics: []telegraf.Metric{},
+			name:  "missing tag value",
+			input: []byte("cpu,a="),
 			err: &ParseError{
 				DecodeError: &lineprotocol.DecodeError{
 					Line:   1,
@@ -728,9 +726,8 @@ func TestSeriesParser(t *testing.T) {
 			},
 		},
 		{
-			name:    "error with carriage return in long line",
-			input:   []byte("cpu,a=" + strings.Repeat("x", maxErrorBufferSize) + "\rcd,b"),
-			metrics: []telegraf.Metric{},
+			name:  "error with carriage return in long line",
+			input: []byte("cpu,a=" + strings.Repeat("x", maxErrorBufferSize) + "\rcd,b"),
 			err: &ParseError{
 				DecodeError: &lineprotocol.DecodeError{
 					Line:   1,
@@ -958,7 +955,7 @@ func TestStreamParserErrorString(t *testing.T) {
 			var errs []error
 			for i := 0; i < 20; i++ {
 				_, err := parser.Next()
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 
@@ -997,7 +994,7 @@ func TestStreamParserReaderError(t *testing.T) {
 	require.Equal(t, err, readerErr)
 
 	_, err = parser.Next()
-	require.Equal(t, err, ErrEOF)
+	require.Equal(t, err, io.EOF)
 }
 
 func TestStreamParserProducesAllAvailableMetrics(t *testing.T) {

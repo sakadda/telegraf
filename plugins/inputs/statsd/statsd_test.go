@@ -202,8 +202,10 @@ func BenchmarkUDPThreads4(b *testing.B) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 1000; i++ {
-				_, err := conn.Write([]byte(testMsg))
-				require.NoError(b, err)
+				if _, err := conn.Write([]byte(testMsg)); err != nil {
+					b.Error(err)
+					return
+				}
 			}
 		}()
 	}
@@ -239,8 +241,10 @@ func BenchmarkUDPThreads8(b *testing.B) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 1000; i++ {
-				_, err := conn.Write([]byte(testMsg))
-				require.NoError(b, err)
+				if _, err := conn.Write([]byte(testMsg)); err != nil {
+					b.Error(err)
+					return
+				}
 			}
 		}()
 	}
@@ -276,8 +280,10 @@ func BenchmarkUDPThreads16(b *testing.B) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 1000; i++ {
-				_, err := conn.Write([]byte(testMsg))
-				require.NoError(b, err)
+				if _, err := conn.Write([]byte(testMsg)); err != nil {
+					b.Error(err)
+					return
+				}
 			}
 		}()
 	}
@@ -1711,7 +1717,7 @@ func TestParse_TimingsMultipleFieldsWithTemplate(t *testing.T) {
 // In this case the behaviour should be the same as normal behaviour
 func TestParse_TimingsMultipleFieldsWithoutTemplate(t *testing.T) {
 	s := NewTestStatsd()
-	s.Templates = []string{}
+	s.Templates = make([]string, 0)
 	s.Percentiles = []Number{90.0}
 	acc := &testutil.Accumulator{}
 

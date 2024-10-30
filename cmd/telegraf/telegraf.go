@@ -40,6 +40,7 @@ type GlobalFlags struct {
 	configURLRetryAttempts int
 	configURLWatchInterval time.Duration
 	watchConfig            string
+	watchInterval          time.Duration
 	pidFile                string
 	plugindDir             string
 	password               string
@@ -213,7 +214,11 @@ func (t *Telegraf) watchLocalConfig(ctx context.Context, signals chan os.Signal,
 	var mytomb tomb.Tomb
 	var watcher watch.FileWatcher
 	if t.watchConfig == "poll" {
-		watcher = watch.NewPollingFileWatcher(fConfig)
+		if t.watchInterval > 0 {
+			watcher = watch.NewPollingFileWatcherWithDuration(fConfig, t.watchInterval)
+		} else {
+			watcher = watch.NewPollingFileWatcher(fConfig)
+		}
 	} else {
 		watcher = watch.NewInotifyFileWatcher(fConfig)
 	}
@@ -343,10 +348,10 @@ func (t *Telegraf) runAgent(ctx context.Context, reloadConfig bool) error {
 	}
 
 	if !(t.test || t.testWait != 0) && len(c.Outputs) == 0 {
-		return errors.New("no outputs found, did you provide a valid config file?")
+		return errors.New("no outputs found, probably invalid config file provided")
 	}
 	if t.plugindDir == "" && len(c.Inputs) == 0 {
-		return errors.New("no inputs found, did you provide a valid config file?")
+		return errors.New("no inputs found, probably invalid config file provided")
 	}
 
 	if int64(c.Agent.Interval) <= 0 {

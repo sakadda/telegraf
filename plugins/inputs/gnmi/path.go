@@ -3,7 +3,7 @@ package gnmi
 import (
 	"strings"
 
-	gnmiLib "github.com/openconfig/gnmi/proto/gnmi"
+	"github.com/openconfig/gnmi/proto/gnmi"
 )
 
 type keySegment struct {
@@ -41,7 +41,7 @@ func newInfoFromString(path string) *pathInfo {
 	return info
 }
 
-func newInfoFromPathWithoutKeys(path *gnmiLib.Path) *pathInfo {
+func newInfoFromPathWithoutKeys(path *gnmi.Path) *pathInfo {
 	info := &pathInfo{
 		origin:   path.Origin,
 		segments: make([]segment, 0, len(path.Elem)),
@@ -57,7 +57,7 @@ func newInfoFromPathWithoutKeys(path *gnmiLib.Path) *pathInfo {
 	return info
 }
 
-func newInfoFromPath(paths ...*gnmiLib.Path) *pathInfo {
+func newInfoFromPath(paths ...*gnmi.Path) *pathInfo {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -101,7 +101,7 @@ func (pi *pathInfo) empty() bool {
 	return len(pi.segments) == 0
 }
 
-func (pi *pathInfo) append(paths ...*gnmiLib.Path) *pathInfo {
+func (pi *pathInfo) append(paths ...*gnmi.Path) *pathInfo {
 	// Copy the existing info
 	path := &pathInfo{
 		origin:    pi.origin,
@@ -209,7 +209,7 @@ func (pi *pathInfo) normalize() {
 	pi.segments = segments
 }
 
-func (pi *pathInfo) equalsPathNoKeys(path *gnmiLib.Path) bool {
+func (pi *pathInfo) equalsPathNoKeys(path *gnmi.Path) bool {
 	if len(pi.segments) != len(path.Elem) {
 		return false
 	}
@@ -290,7 +290,7 @@ func (pi *pathInfo) keepCommonPart(path *pathInfo) {
 	pi.segments = pi.segments[:matchLen]
 }
 
-func (pi *pathInfo) Dir() string {
+func (pi *pathInfo) dir() string {
 	if len(pi.segments) <= 1 {
 		return ""
 	}
@@ -309,7 +309,7 @@ func (pi *pathInfo) Dir() string {
 	return dir
 }
 
-func (pi *pathInfo) Base() string {
+func (pi *pathInfo) base() string {
 	if len(pi.segments) == 0 {
 		return ""
 	}
@@ -321,7 +321,7 @@ func (pi *pathInfo) Base() string {
 	return s.id
 }
 
-func (pi *pathInfo) Path() (origin, path string) {
+func (pi *pathInfo) path() (origin, path string) {
 	if len(pi.segments) == 0 {
 		return pi.origin, "/"
 	}
@@ -333,7 +333,7 @@ func (pi *pathInfo) Path() (origin, path string) {
 	return pi.origin, path
 }
 
-func (pi *pathInfo) FullPath() string {
+func (pi *pathInfo) fullPath() string {
 	var path string
 	if pi.origin != "" {
 		path = pi.origin + ":"
@@ -360,14 +360,14 @@ func (pi *pathInfo) String() string {
 		return ""
 	}
 
-	origin, path := pi.Path()
+	origin, path := pi.path()
 	if origin != "" {
 		return origin + ":" + path
 	}
 	return path
 }
 
-func (pi *pathInfo) Tags(pathPrefix bool) map[string]string {
+func (pi *pathInfo) tags(pathPrefix bool) map[string]string {
 	tags := make(map[string]string, len(pi.keyValues))
 	for _, s := range pi.keyValues {
 		var prefix string

@@ -44,7 +44,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/orchestration/v1/stacks"
 
 	"github.com/influxdata/telegraf"
-	httpconfig "github.com/influxdata/telegraf/plugins/common/http"
+	common_http "github.com/influxdata/telegraf/plugins/common/http"
 	"github.com/influxdata/telegraf/plugins/inputs"
 )
 
@@ -74,7 +74,7 @@ type OpenStack struct {
 	MeasureRequest   bool            `toml:"measure_openstack_requests"`
 	AllTenants       bool            `toml:"query_all_tenants"`
 	Log              telegraf.Logger `toml:"-"`
-	httpconfig.HTTPClientConfig
+	common_http.HTTPClientConfig
 
 	client *http.Client
 
@@ -233,8 +233,8 @@ func (o *OpenStack) Start(telegraf.Accumulator) error {
 	}
 
 	// Prepare cross-dependency information
-	o.openstackFlavors = map[string]flavors.Flavor{}
-	o.openstackProjects = map[string]projects.Project{}
+	o.openstackFlavors = make(map[string]flavors.Flavor)
+	o.openstackProjects = make(map[string]projects.Project)
 	if slices.Contains(o.EnabledServices, "servers") {
 		// We need the flavors to output machine details for servers
 		page, err := flavors.ListDetail(o.compute, nil).AllPages(ctx)
@@ -337,7 +337,7 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 
 	if o.MeasureRequest {
 		for service, duration := range callDuration {
-			acc.AddFields("openstack_request_duration", map[string]interface{}{service: duration}, map[string]string{})
+			acc.AddFields("openstack_request_duration", map[string]interface{}{service: duration}, make(map[string]string))
 		}
 	}
 
