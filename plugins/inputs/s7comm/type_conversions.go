@@ -55,13 +55,12 @@ func determineConversion(dtype string) converterFunc {
 	case "R":
 		return func(buf []byte) interface{} {
 			x := binary.BigEndian.Uint32(buf)
-			return math.Float32frombits(x)
+			return math.Round(math.Float32frombits(x)*100) / 100
 		}
 	case "RR":
 		return func(buf []byte) interface{} {
 			x := binary.BigEndian.Uint64(buf)
-			rounded := math.Round(math.Float64frombits(x)*100) / 100
-			return rounded
+			return math.Round(math.Float64frombits(x)*100) / 100
 		}
 	case "DT":
 		return func(buf []byte) interface{} {
