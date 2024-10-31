@@ -55,9 +55,7 @@ func determineConversion(dtype string) converterFunc {
 	case "R":
 		return func(buf []byte) interface{} {
 			x := binary.BigEndian.Uint32(buf)
-			f := math.Float32frombits(x)
-			rounded := float32(math.Round(float64(f)*100) / 100)
-			return rounded
+			return math.Float32frombits(x)
 		}
 	case "RR":
 		return func(buf []byte) interface{} {
