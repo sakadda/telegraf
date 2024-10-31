@@ -369,9 +369,9 @@ func handleFieldAddress(address string) (*gos7.S7DataItem, converterFunc, error)
 		buflen = 1
 	case "W", "I": // 16-bit types
 		buflen = 2
-	case "DW", "DI": // 32-bit types
+	case "DW", "DI", "R": // 32-bit types
 		buflen = 4
-	case "R", "RR": // 64-bit types
+	case "RR": // 64-bit types
 		buflen = 8
 	case "LR", "LI": // 64-bit types
 		buflen = 8
