@@ -64,38 +64,40 @@ func (d *Dedup) Apply(metrics ...telegraf.Metric) []telegraf.Metric {
 		}
 
 		if time.Since(m.Time()) >= time.Duration(d.DedupInterval) {
+			// Интервал истёк, отправляем метрику полностью
 			d.save(metric, id)
 			metrics[idx] = metric
 			idx++
 			continue
-		}
-
-		// Список полей для удаления (неизменившиеся поля)
-		fieldsToRemove := []string{}
-		for _, f := range metric.FieldList() {
-			if value, ok := m.GetField(f.Key); ok && value == f.Value {
-				// Значение поля не изменилось, помечаем для удаления
-				fieldsToRemove = append(fieldsToRemove, f.Key)
-			} else {
-				// Значение поля изменилось или новое поле, обновляем кэш
-				m.AddField(f.Key, f.Value)
-			}
-		}
-
-		// Удаляем неизменившиеся поля из метрики
-		for _, fieldKey := range fieldsToRemove {
-			metric.RemoveField(fieldKey)
-		}
-
-		if len(metric.FieldList()) > 0 {
-			// Есть изменившиеся поля, обновляем время в кэше и сохраняем метрику
-			m.SetTime(metric.Time())
-			d.Cache[id] = m
-			metrics[idx] = metric
-			idx++
 		} else {
-			// Нет изменившихся полей, удаляем метрику
-			metric.Drop()
+			// Интервал не истёк, проверяем изменившиеся поля
+			// Список полей для удаления (неизменившиеся поля)
+			fieldsToRemove := []string{}
+			for _, f := range metric.FieldList() {
+				if value, ok := m.GetField(f.Key); ok && value == f.Value {
+					// Значение поля не изменилось, помечаем для удаления
+					fieldsToRemove = append(fieldsToRemove, f.Key)
+				} else {
+					// Значение поля изменилось или новое поле, обновляем кэш
+					m.AddField(f.Key, f.Value)
+				}
+			}
+
+			// Удаляем неизменившиеся поля из метрики
+			for _, fieldKey := range fieldsToRemove {
+				metric.RemoveField(fieldKey)
+			}
+
+			if len(metric.FieldList()) > 0 {
+				// Есть изменившиеся поля, обновляем время в кэше и сохраняем метрику
+				m.SetTime(metric.Time())
+				d.Cache[id] = m
+				metrics[idx] = metric
+				idx++
+			} else {
+				// Нет изменившихся полей, удаляем метрику
+				metric.Drop()
+			}
 		}
 	}
 	metrics = metrics[:idx]
