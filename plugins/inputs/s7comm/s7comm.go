@@ -18,7 +18,7 @@ import (
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/internal"
-	"github.com/influxdata/telegraf/metric"
+	tm "github.com/influxdata/telegraf/metric"
 	"github.com/influxdata/telegraf/plugins/inputs"
 )
 
@@ -201,7 +201,7 @@ func (s *S7comm) Gather(acc telegraf.Accumulator) error {
 			// Group the data by series
 			// grouper.Add(m.measurement, m.tags, timestamp, m.field, value)
 
-			newMetric := metric.New(
+			newMetric := tm.New(
 				m.measurement,
 				m.tags,
 				map[string]interface{}{m.field: value},
