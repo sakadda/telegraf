@@ -51,60 +51,56 @@ func (*Dedup) SampleConfig() string {
 
 // main processing method
 func (d *Dedup) Apply(metrics ...telegraf.Metric) []telegraf.Metric {
-    idx := 0
-    for _, metric := range metrics {
-        id := metric.HashID()
-        m, ok := d.Cache[id]
+	idx := 0
+	for _, metric := range metrics {
+		id := metric.HashID()
+		m, ok := d.Cache[id]
 
-        if !ok {
-            d.save(metric, id)
-            metrics[idx] = metric
-            idx++
-            continue
-        }
+		if !ok {
+			d.save(metric, id)
+			metrics[idx] = metric
+			idx++
+			continue
+		}
 
-        if time.Since(m.Time()) >= time.Duration(d.DedupInterval) {
-            d.save(metric, id)
-            metrics[idx] = metric
-            idx++
-            continue
-        }
+		if time.Since(m.Time()) >= time.Duration(d.DedupInterval) {
+			d.save(metric, id)
+			metrics[idx] = metric
+			idx++
+			continue
+		}
 
-        newFields := make(map[string]interface{})
-        for _, f := range metric.FieldList() {
-            if value, ok := m.GetField(f.Key); !ok || value != f.Value {
-                newFields[f.Key] = f.Value
-            }
-        }
+		// Список полей для удаления (неизменившиеся поля)
+		fieldsToRemove := []string{}
+		for _, f := range metric.FieldList() {
+			if value, ok := m.GetField(f.Key); ok && value == f.Value {
+				// Значение поля не изменилось, помечаем для удаления
+				fieldsToRemove = append(fieldsToRemove, f.Key)
+			} else {
+				// Значение поля изменилось или новое поле, обновляем кэш
+				m.AddField(f.Key, f.Value)
+			}
+		}
 
-        if len(newFields) > 0 {
-            // Создаём новую метрику с изменившимися полями
-            newMetric := telegraf.NewMetric(
-                metric.Name(),
-                metric.Tags(),
-                newFields,
-                metric.Time(),
-            )
+		// Удаляем неизменившиеся поля из метрики
+		for _, fieldKey := range fieldsToRemove {
+			metric.RemoveField(fieldKey)
+		}
 
-            // Обновляем поля и время в кэше
-            for k, v := range newFields {
-                m.RemoveField(k)
-                m.AddField(k, v)
-            }
-            m.SetTime(metric.Time())
-            d.Cache[id] = m
-
-            metrics[idx] = newMetric
-            idx++
-            continue
-        }
-
-        // Если нет изменившихся полей, удаляем метрику
-        metric.Drop()
-    }
-    metrics = metrics[:idx]
-    d.cleanup()
-    return metrics
+		if len(metric.FieldList()) > 0 {
+			// Есть изменившиеся поля, обновляем время в кэше и сохраняем метрику
+			m.SetTime(metric.Time())
+			d.Cache[id] = m
+			metrics[idx] = metric
+			idx++
+		} else {
+			// Нет изменившихся полей, удаляем метрику
+			metric.Drop()
+		}
+	}
+	metrics = metrics[:idx]
+	d.cleanup()
+	return metrics
 }
 
 func (d *Dedup) GetState() interface{} {
