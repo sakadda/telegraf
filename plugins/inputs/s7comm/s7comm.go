@@ -18,7 +18,7 @@ import (
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/config"
 	"github.com/influxdata/telegraf/internal"
-	tm "github.com/influxdata/telegraf/metric"
+	"github.com/influxdata/telegraf/metric"
 	"github.com/influxdata/telegraf/plugins/inputs"
 )
 
@@ -178,7 +178,7 @@ func (s *S7comm) Stop() {
 // Gather collects the data from the device
 func (s *S7comm) Gather(acc telegraf.Accumulator) error {
 	timestamp := time.Now()
-	// grouper := metric.NewSeriesGrouper()
+	grouper := metric.NewSeriesGrouper()
 
 	for i, b := range s.batches {
 		// Read the batch
@@ -199,28 +199,14 @@ func (s *S7comm) Gather(acc telegraf.Accumulator) error {
 			s.Log.Debugf("  got %v for field %q @ %d --> %v (%T)", buf, m.field, b.items[j].Start, value, value)
 
 			// Group the data by series
-			// grouper.Add(m.measurement, m.tags, timestamp, m.field, value)
-
-			newMetric := tm.New(
-				m.measurement,
-				m.tags,
-				map[string]interface{}{m.field: value},
-				timestamp,
-			)
-			// if err != nil {
-			//     s.Log.Errorf("Error creating metric: %v", err)
-			//     continue
-			// }
-
-			// Добавление метрики в аккумулятор
-			acc.AddMetric(newMetric)
+			grouper.Add(m.measurement, m.tags, timestamp, m.field, value)
 		}
 	}
 
 	// Add the metrics grouped by series to the accumulator
-	// for _, x := range grouper.Metrics() {
-	// 	acc.AddMetric(x)
-	// }
+	for _, x := range grouper.Metrics() {
+		acc.AddMetric(x)
+	}
 
 	return nil
 }
