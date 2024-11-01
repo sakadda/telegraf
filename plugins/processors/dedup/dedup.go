@@ -78,17 +78,22 @@ func (d *Dedup) Apply(metrics ...telegraf.Metric) []telegraf.Metric {
         }
 
         if len(newFields) > 0 {
-            newMetric := metric.Copy()
-            newMetric.ClearFields()
+            // Создаём новую метрику с изменившимися полями
+            newMetric := telegraf.NewMetric(
+                metric.Name(),
+                metric.Tags(),
+                newFields,
+                metric.Time(),
+            )
+
+            // Обновляем поля и время в кэше
             for k, v := range newFields {
-                newMetric.AddField(k, v)
-                // Обновляем поле в кэше
                 m.RemoveField(k)
                 m.AddField(k, v)
             }
-            // Обновляем время в кэше
             m.SetTime(metric.Time())
             d.Cache[id] = m
+
             metrics[idx] = newMetric
             idx++
             continue
