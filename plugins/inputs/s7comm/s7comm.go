@@ -375,7 +375,7 @@ func handleFieldAddress(address string) (*gos7.S7DataItem, converterFunc, error)
 		buflen = 8
 	case "LR", "LI": // 64-bit types
 		buflen = 8
-		amount = buflen
+		amount = 8
 	case "DT": // 7-byte
 		buflen = 7
 	case "S":
