@@ -67,11 +67,15 @@ func determineConversion(dtype string) converterFunc {
 			return helper.GetDateTimeAt(buf, 0).UnixNano()
 		}
 	case "LR":
-		return func(buf []byte) interface{} {
-			return func(b []byte) interface{} {
-				return math.Float64frombits(binary.BigEndian.Uint64(b))
-			}
-		}
+        return func(b []byte) interface{} {
+            if len(b) != 8 {
+                return nil
+            }
+            high := binary.BigEndian.Uint32(b[:4])
+            low := binary.BigEndian.Uint32(b[4:])
+            combined := uint64(high)<<32 | uint64(low)
+            return math.Float64frombits(combined)
+        }
 	case "LI":
 		return func(buf []byte) interface{} {
 			if len(buf) != 8 {

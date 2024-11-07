@@ -50,8 +50,8 @@ var (
 		"DI": 0x07, // Double integer (32 bit)
 		"R":  0x08, // IEEE 754 real (32 bit)
 		"RR": 0x08, // Rounded IEEE 754 real (32 bit)
-		"LR": 0x02, // Treat LREAL as Byte array
-		"LI": 0x02, // Treat LINT as Byte array
+		"LR": 0x06, // Treat LREAL as Byte array
+		"LI": 0x06, // Treat LINT as Byte array
 		// see https://support.industry.siemens.com/cs/document/36479/date_and_time-format-for-s7-?dti=0&lc=en-DE
 		"DT": 0x0F, // Date and time (7 byte)
 	}
@@ -375,7 +375,7 @@ func handleFieldAddress(address string) (*gos7.S7DataItem, converterFunc, error)
 		buflen = 8
 	case "LR", "LI": // 64-bit types
 		buflen = 8
-		amount = 8
+		amount = 2
 	case "DT": // 7-byte
 		buflen = 7
 	case "S":
