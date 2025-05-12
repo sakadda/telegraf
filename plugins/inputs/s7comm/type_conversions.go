@@ -52,37 +52,30 @@ func determineConversion(dtype string) converterFunc {
 		return func(buf []byte) interface{} {
 			return int32(binary.BigEndian.Uint32(buf))
 		}
+	case "LI":
+		return func(buf []byte) interface{} {
+			if len(buf) != 8 {
+				return nil
+			}
+			return int64(binary.BigEndian.Uint64(buf))
+		}
 	case "R":
 		return func(buf []byte) interface{} {
 			x := binary.BigEndian.Uint32(buf)
 			return math.Float32frombits(x)
 		}
-	case "RR":
+	case "LR":
 		return func(buf []byte) interface{} {
-			x := binary.BigEndian.Uint64(buf)
-			return math.Round(math.Float64frombits(x)*100) / 100
+			if len(buf) != 8 {
+				return nil
+			}
+			return math.Float64frombits(binary.BigEndian.Uint64(buf))
 		}
 	case "DT":
 		return func(buf []byte) interface{} {
 			return helper.GetDateTimeAt(buf, 0).UnixNano()
 		}
-	case "LR":
-        return func(b []byte) interface{} {
-            if len(b) != 8 {
-                return nil
-            }
-            high := binary.BigEndian.Uint32(b[:4])
-            low := binary.BigEndian.Uint32(b[4:])
-            combined := uint64(high)<<32 | uint64(low)
-            return math.Float64frombits(combined)
-        }
-	case "LI":
-		return func(buf []byte) interface{} {
-			if len(buf) != 8 {
-				return ""
-			}
-			return int64(binary.BigEndian.Uint64(buf))
-		}
+
 	}
 
 	panic("Unknown type! Please file an issue on https://github.com/influxdata/telegraf including your config.")
